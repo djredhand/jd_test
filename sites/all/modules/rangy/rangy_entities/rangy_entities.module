@@ -1,0 +1,159 @@
+<?php
+
+/**
+ * @file
+ * Main file for the Rangy entities module.
+ * Defines the Rangy entity.
+ * 
+ * @todo check if a rangy type exists before loading bundles
+ * 
+ */
+
+
+/**
+ * Implements hook_entity_info().
+ */
+function rangy_entities_entity_info() {
+
+  $return['rangy'] = array(
+    'label' => t('Rangy'),
+    'plural label' => t('Rangy entities'),
+    'entity class' => 'Rangy',
+    'creation callback' => 'rangy_create',
+    'controller class' => 'EntityAPIController',
+    'base table' => 'rangy',
+    'fieldable' => TRUE,
+    'entity keys' => array(
+      'id' => 'rid',
+      'bundle' => 'type',
+    ), 
+    'bundles' => array(),
+    'bundle keys' => array(
+      'bundle' => 'type',
+    ),
+    'label callback' => 'entity_class_label',
+    'uri callback' => 'entity_class_uri',
+    'access callback' => 'rangy_access',
+    'module' => 'rangy_entities',
+    'admin ui' => array(
+      'path' => 'rangy',
+      'controller class' => 'RangyUIController',
+      'menu wildcard' => '%rangy_entities_rid',
+    ),
+  );
+
+  return $return;
+}
+
+/**
+ * Implements hook_entity_info_alter().
+ */
+function rangy_entities_entity_info_alter(&$entity_info) {
+
+  $entity_info['rangy_type']['bundle of'] = 'rangy';
+  $entity_info['rangy']['bundles'] = rangy_get_bundles();
+}
+
+/**
+ * Returns the 'bundles' key array in hook_entity_info_alter().
+ */
+function rangy_get_bundles() {
+  foreach (rangy_get_types() as $type => $info) {
+    $bundles[$type] = array(
+      'label' => $info->label,
+      'admin' => array(
+        'path' => 'admin/structure/rangy_types/manage/%rangy_type',
+        'real path' => 'admin/structure/rangy_types/manage/' . $type,
+        'bundle argument' => 4,
+        'access arguments' => array('administer the rangy module'),
+      ),
+    );
+  }
+  return $bundles;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function rangy_entities_permission() {
+  
+  // Generates permissions per Rangy type
+  foreach (rangy_get_types() as $type) {
+
+    $type_name = check_plain($type->type);
+    $permissions = array(
+      "view own $type_name rangy" => array(
+        'title' => t('%type_name: View own Rangy', array('%type_name' => $type->label)),
+      ),     
+      "view any $type_name rangy" => array(
+        'title' => t('%type_name: View any Rangy', array('%type_name' => $type->label)),
+      ),
+      "edit own $type_name rangy" => array(
+        'title' => t('%type_name: Edit own Rangy', array('%type_name' => $type->label)),
+      ),      
+      "edit any $type_name rangy" => array(
+        'title' => t('%type_name: Edit any Rangy', array('%type_name' => $type->label)),
+      ),
+      "delete own $type_name rangy" => array(
+        'title' => t('%type_name: Delete own Rangy', array('%type_name' => $type->label)),
+      ),     
+      "delete any $type_name rangy" => array(
+        'title' => t('%type_name: Delete any Rangy', array('%type_name' => $type->label)),
+      ),
+    );
+  }
+ 
+  return $permissions;
+}
+
+/**
+ * Determines whether the given user has access to a Rangy.
+ *
+ * @param $op
+ *   The operation being performed. One of 'view', 'edit', 'delete'.
+ * @param $rangy
+ *   A Rangy to check access for.
+ * @param $account
+ *   The user to check for. Leave it to NULL to check for the global user.
+ * @return boolean
+ *   Whether access is allowed or not.
+ */
+function rangy_access($op, $rangy = NULL, $account = NULL) {
+  $user = isset($account) ? $account : $GLOBALS['user']->uid;
+  if (isset($rangy) && ($type_name = $rangy->type) && ($author = $rangy->uid)) {
+
+    if (user_access("$op any $type_name rangy", $account)) {
+      return TRUE;
+    }
+    elseif ($user == $author) {
+      if (user_access("$op own $type_name rangy", $account)) {
+        return TRUE;
+      }
+    }
+  }
+
+  return FALSE;
+}
+
+/**
+ * Creates a Rangy object.
+ */
+function rangy_create($values = array()) {
+  return entity_get_controller('rangy')->create($values);
+}
+
+/**
+ * Menu argument loader.
+ * Fetch a Rangy object from the Url.
+ *
+ * @param $rid
+ *   Integer specifying the Rangy id.
+ * @return
+ *   A fully-loaded $rangy object or FALSE if it cannot be loaded.
+ *
+ */
+function rangy_entities_rid_load($rid) {
+
+  $rangy = entity_load('rangy', array($rid));
+  return reset($rangy);
+}

@@ -1,0 +1,13 @@
+name = Rangy entities
+description = Defines Rangy fieldable entities.
+core = 7.x
+
+; Entity class
+files[] = rangy_entities.class.inc
+
+; UI
+files[] = rangy_entities.admin.inc
+
+dependencies[] = rangy
+
+package = Rangy

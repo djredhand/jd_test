@@ -1,0 +1,144 @@
+#scroll_wrapper {
+	width:75%;
+	/*height:580px;*/
+
+	float:left;
+	position:relative;	/* On older OS versions "position" and "z-index" must be defined, */
+	z-index:1;			/* it seems that recent webkit is less picky and works anyway. */
+	overflow:hidden;
+}
+
+#scroll_scroller {
+	width:5775px;
+	height:100%;
+	float:left;
+	padding:0;
+	color:#000;
+}
+
+#scroll_scroller ul {
+	list-style:none;
+	display:block;
+	float:left;
+	height:100%;
+	padding:0;
+	margin:0;
+	text-align:left;
+	color:#000;
+}
+
+#scroll_scroller li {
+	-webkit-box-sizing:border-box;
+	-moz-box-sizing:border-box;
+	-o-box-sizing:border-box;
+	box-sizing:border-box;
+	display:block; 
+	float:left;
+	/*width:825px; 
+	height:580px;*/
+	height:80%;
+	text-align:center;
+	font-family:georgia;
+	font-size:18px;
+	line-height:140%;
+	color:#000;
+}
+
+#scroll_nav {
+	width: 100%;
+	background:url(../images/scroll_nav_bg.png);
+	position: absolute;
+	z-index: 99;
+	height:90px;
+	padding: 5px 0 0 0;
+	bottom:0;
+}
+#scroll_nav_wrap{
+	width:6;
+	color:#000;
+	
+}
+#scroll_prev, #scroll_next {
+	font-weight:bold;
+	font-size:14px;
+	padding:5px 0;
+	width:10%;
+	cursor: pointer;
+	position: absolute;
+	height:100%;
+	color:#FFF;
+	text-shadow:1px 0px 3px #000;
+}
+#scroll_prev img, #scroll_next img{
+	margin-top: 285px;
+}
+#scroll_prev:hover{
+/*background: url(../images/prev.png) repeat-y;*/
+background-position: top left;
+}
+
+#scroll_next:hover{
+/*background: url(../images/next.png) repeat-y;*/
+background-position: top right;
+}
+
+#scroll_prev:hover, #scroll_next:hover {
+
+}
+#scroll_next {
+	text-align:right;
+	left:90%;
+}
+
+#scroll_indicator, #scroll_indicator > li {
+	display:block; float:left;
+	list-style:none;
+	padding:0; margin:0;
+}
+
+#scroll_indicator {
+	padding:0px 0 0 30px;
+}
+
+#scroll_indicator > li {
+	cursor: pointer;
+	width:60px; height:40px;
+	background-size:100%;
+	overflow:hidden;
+	margin-right:4px;
+	color:#000;
+	border:1px solid #005A7F;
+}
+
+#scroll_indicator > li.active {
+	background:#888;
+	 box-shadow: 0px 0px 18px #fff;
+   
+}
+
+#scroll_indicator > li:last-child {
+	margin:0;
+}
+.gallery-image{
+	width:100%;
+	/*width:844px;*/
+	height:100%;
+	
+}
+#scroll_thelist li{
+-webkit-transform:translate3d(0,0,0);
+}
+li.active_gallery{
+	font-weight: bold;
+	text-decoration: underline;
+	text-shadow: 0px 5px 12px #000;
+}
+.gal_li span{
+cursor:pointer;
+}
+.clone{
+position: fixed;
+padding: 0;
+border: none !important;
+background: #000;
+}

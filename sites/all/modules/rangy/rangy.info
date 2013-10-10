@@ -1,0 +1,15 @@
+name = Rangy
+description = The core Rangy module.
+core = 7.x
+
+; Entity class
+files[] = rangy_type.class.inc
+
+
+dependencies[] = entity
+dependencies[] = field
+dependencies[] = libraries
+
+configure = admin/structure/rangy_types
+
+package = Rangy

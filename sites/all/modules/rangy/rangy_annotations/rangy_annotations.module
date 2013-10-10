@@ -1,0 +1,45 @@
+<?php
+
+/**
+ * @file
+ * Main file for the Rangy annotation module.
+ * This module ...
+ */ 
+
+/**
+ * Implements hook_rangy_reaction_info.
+ */
+function rangy_annotations_rangy_reaction_info($variables = array()) {
+  dpm($variables);
+  $url = ($GLOBALS['conf']['clean_url']) ? '"' : '"?q=';
+  if (!empty($variables)) {   
+    $url .= 'rangy/add/' . rangy_get_types($variables['rangy_type_id'])->type . '/' . $variables['entity_type'] . '/' . $variables['entity_id'] . '";';
+  }
+
+  $reaction = array(
+    'annotation' => array(
+      'label' => t('Annotation'),
+      //'javascript file' => drupal_get_path('module', 'rangy_annotations') . '/rangy_annotations.js',
+      'javascript inline' => "window.location.href = $url;",
+      //'first' => 'inline',
+      'reaction callback' => 'rangy_annotations_callback',
+      'reaction arguments' => array($variables),
+    ),
+  );
+  return $reaction;
+}
+
+function rangy_annotations_callback($variables) {
+  $entity = entity_load($variables['entity_type'], array($variables['entity_id']));
+  $entity = reset($entity);
+  
+  $entity->{$variables['field_name']}['und'][0]['value'] = $variables['field_html'];
+  entity_save($variables['entity_type'], $entity);
+}
+
+function rangy_annotations_rangy_entity_created($rangy, $entity) {
+
+  dpm($rangy);
+  dpm($entity);
+  drupal_add_js(drupal_get_path('module', 'rangy_annotations') . '/rangy_annotations.js');
+}

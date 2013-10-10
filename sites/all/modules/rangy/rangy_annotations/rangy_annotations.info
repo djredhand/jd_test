@@ -1,0 +1,7 @@
+name = Rangy annotations
+description = An annotation system based on the Rangy module.
+core = 7.x
+
+dependencies[] = rangy_entities
+
+package = Rangy

@@ -1,0 +1,365 @@
+<?php
+
+/**
+ * @file
+ * Main file for the Rangy module.
+ * Defines the Rangy type entity and handles the Ajax response.
+ */  
+
+
+/**
+ * Implements hook_entity_info().
+ */
+function rangy_entity_info() {
+
+  $return['rangy_type'] = array(
+    'label' => t('Rangy Type'),
+    'entity class' => 'RangyType',
+    'controller class' => 'EntityAPIControllerExportable',
+    'base table' => 'rangy_type',
+    'fieldable' => FALSE,
+    'exportable' => TRUE,
+    'entity keys' => array(
+      'id' => 'id',
+      'name' => 'type',
+      'label' => 'label',
+    ),
+    'access callback' => 'rangy_type_access',
+    'module' => 'rangy',
+    // Enable the entity API's admin UI.
+    'admin ui' => array(
+      'path' => 'admin/structure/rangy_types',
+      'file' => 'rangy_type.admin.inc',
+      'controller class' => 'EntityDefaultUIController',
+    ),
+  );
+
+  return $return;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function rangy_permission() {
+  $permissions = array(
+    'administer the rangy module' => array(
+      'title' => t('Administer the Rangy module'),
+      'description' => t('Create and manage Rangy types as well as enable them on fields.'),
+    ),
+  );
+  
+  // Generates permissions per Rangy type
+  foreach (rangy_get_types() as $type) {
+    $type_name = check_plain($type->type);
+    $permissions += array(
+      "use $type_name rangy type" => array(
+        'title' => t('Use %type_name', array('%type_name' => $type->label)),
+      ),
+    );
+  }
+  return $permissions;
+}
+
+/**
+ * Menu argument loader; Load a Rangy type by string.
+ *
+ * @param $type
+ *   The machine-readable name of a Rangy type to load.
+ * @return
+ *   A Rangy type array or FALSE if $type does not exist.
+ */
+function rangy_type_load($type) {
+  return rangy_get_types($type);
+}
+
+/**
+ * Gets an array of all Rangy types, keyed by the type name.
+ *
+ * @param $name
+ *   If set, the type with the given name (or id) is returned.
+ */
+function rangy_get_types($name = NULL) {
+  $types = entity_load_multiple_by_name('rangy_type', isset($name) ? array($name) : FALSE);
+  return isset($name) ? reset($types) : $types;
+}
+
+/**
+ * Access callback for the entity API.
+ */
+function rangy_type_access($op = NULL, $type = NULL, $account = NULL) {
+  return user_access('administer the rangy module', $account);
+}
+
+/**
+ * Implements hook_init().
+ */
+function rangy_init() {
+  $lib = libraries_get_libraries();
+  if (!isset($lib['rangy'])) {
+    $dl_link = l(t('Download the Rangy Javascript library'), 'http://code.google.com/p/rangy/downloads/list');
+    drupal_set_message($dl_link . ' ' . t('and extract the entire content of the archive into the sites/all/libraries/rangy folder of your server.'), 'warning');
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ * @todo when module uninstaled and reinstalled, default select value not 'None'
+ * @todo limit possible field types 
+ */
+function rangy_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
+  //limit possible field types ?
+  //$type = $form['#field']['type'];
+  //if($type == 'text_with_summary' || $type == ''...)
+  if (user_access('administer the rangy module')) {
+    $form['instance']['rangy'] = array(
+      '#weight' => 10,
+      '#access' => user_access('administer the rangy module'),
+      );
+    $form['instance']['fieldset'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Rangy'),
+      );
+    if (count(rangy_get_types()) > 0) {
+      $form['instance']['fieldset']['rangy_type_select'] = array(
+        '#type' => 'select',
+        '#title' => t('Rangy type to activate on this field'),
+        '#options' => rangy_type_select_array(),
+        '#default_value' => isset($form['#instance']['fieldset']['rangy_type_select']) ? $form['#instance']['fieldset']['rangy_type_select'] : 0,
+        '#description' => t('Authorized users will be able to use this Rangy type on each instance of this field.')
+        );
+      $form['#submit'][]= 'rangy_field_form_submit';
+    }
+    else {
+      $link = l(t('Create a new one.'), 'admin/structure/rangy_types/add');
+      $form['instance']['fieldset']['item'] = array(
+        '#type' => 'item',
+        '#title' => check_plain(t('No Rangy type available.') . ' ' . $link),
+        );
+    }
+  }
+}
+
+/**
+ * Returns the array for the rangy_type_select element in rangy_form_field_ui_field_edit_form_alter.
+ * 
+ * @return
+ *   An numeric array with Rangy types as values. First value is "None".
+ */
+function rangy_type_select_array() {
+  $return = array();
+  $return[0] = t('None');
+  $i=1;
+  foreach (rangy_get_types() as $type => $info) {
+    $return[$i] = t($type);
+    $i++;
+  }
+  return $return;
+}
+
+/**
+ * Submit callback for field_ui_field_edit_form_alter.
+ * 
+ * Saves the selected Rangy type to the db.
+ */
+function rangy_field_form_submit($form, &$form_state) {
+  $rt_id = $form_state['values']['instance']['fieldset']['rangy_type_select']; //The Rangy type id
+  $fi_id = $form['#instance']['id']; //The field instance id
+  $update = db_update('field_config_instance')
+    ->fields(array('rangy_type' => $rt_id))
+    ->condition('id', $fi_id)
+    ->execute();
+}
+
+/**
+ * Implements hook_preprocess_HOOK().
+ * @todo add more 'entity_id' or provide a hook
+ */
+function rangy_preprocess_field(&$variables) {
+  static $i = 0;
+  
+  //Check if the field is rangy-enabled
+  $rangy_field_name = $variables['element']['#field_name'];
+  $rangy_entity_type = $variables['element']['#entity_type'];
+  $rangy_bundle = $variables['element']['#bundle'];
+  
+  $field_instance = rangy_field_is_rangy_enabled($rangy_entity_type, $rangy_bundle, $rangy_field_name);
+
+  if ($field_instance) {
+    $rtid = $field_instance->rangy_type;
+    $fiid = $field_instance->id;
+    $field_name = $field_instance->field_name;
+    $rt_name = $field_instance ? rangy_get_types($rtid)->type : NULL;
+  }
+  
+  // Build settings, add JS files and add 'rangy-enabled' class to fields if the user is allowed to use this Rangy type
+  if ($field_instance && user_access('use ' . $rt_name . ' rangy type')) {
+    
+    $i++;
+    switch ($rangy_entity_type) {
+      case 'node':
+        $entity_id = $variables['element']['#object']->nid;
+        break;
+      case 'comment':
+        $entity_id = $variables['element']['#object']->cid;
+        break;
+      case 'user':
+        $entity_id = $variables['element']['#object']->uid;
+        break;
+      case 'rangy':
+        $entity_id = $variables['element']['#object']->rid;
+      //...
+    }
+
+    global $conf;
+    $settings = array(
+      'cleanUrls' => intval($conf['clean_url']),
+      'image' => drupal_get_path('module', 'rangy') . '/images/Comment-add32.png',
+      'fiid' . $i => $fiid,
+      'rtid' . $i => $rtid,
+      'et' . $i => $rangy_entity_type,
+      'eid' . $i => $entity_id,
+      'fname' . $i => $field_name,
+    );
+    drupal_add_js(array('rangy' => $settings), 'setting');
+    drupal_add_js(libraries_get_path('rangy') . '/rangy-core.js');
+    drupal_add_js(libraries_get_path('rangy') . '/rangy-serializer.js');
+    drupal_add_js(drupal_get_path('module', 'rangy') . '/rangy.js');
+    $variables['classes_array'][] = 'rangy-enabled';
+  }
+}
+
+/**
+ * Builds an array of rangy-enabled field instances keyed by field instance id.
+ * 
+ * @return
+ *   An array keyed by field instance ids
+ */
+function rangy_get_fields() {
+  //Execute the query only once per page load
+  static $count = 0, $rangy_fields;
+  if ($count) return $rangy_fields;
+  $count++;
+  
+  $rangy_fields = db_select('field_config_instance', 'f')
+    ->fields('f')
+    ->condition('rangy_type', 0, '<>');
+  $rangy_fields = $rangy_fields
+    ->execute()
+    ->fetchAllAssoc('id');
+  return $rangy_fields;
+}
+
+/**
+ * Checks if a field instance is rangy-enabled.
+ * The field instance id is not in the $variables array of hook_preprocess, so we have to check the entity type, 
+ * the bundle and the field name.
+ * 
+ * @param $entity_type
+ *   The entity type of the field instance to check for.
+ * @param $bundle
+ *   The bundle of the field instance to check for.
+ * @param $field_name
+ *   The field name of the field instance to check for.
+ * 
+ * @return
+ *   The field instance object, or FALSE if the field instance is not rangy-enabled.
+ */
+function rangy_field_is_rangy_enabled($entity_type, $bundle, $field_name) {
+  $rgf = rangy_get_fields();
+
+  foreach ($rgf as $id => $value) {
+    if ($value->entity_type == $entity_type && $value->bundle == $bundle && $value->field_name == $field_name) {
+      return $value;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_menu.
+ */
+//The url receiving the Ajax request
+function rangy_menu() {
+  $items['rangy_request'] = array(
+    'type' => MENU_CALLBACK,
+    'title' => 'Rangy request handling',
+    'page callback' => 'rangy_request_handling',
+    'access callback' => TRUE,
+  );
+
+  return $items;
+}
+
+/**
+ * Page callback for the Ajax request.
+ * @todo check if user has access to rangy type (he could add the class to the field himself)
+ */
+function rangy_request_handling() {
+
+    $text = (isset($_POST["text"])) ? $_POST["text"] : NULL;
+    $selection = (isset($_POST["selection"])) ? $_POST["selection"] : NULL;
+    $html = (isset($_POST["html"])) ? $_POST["html"] : NULL;
+    $field_html = (isset($_POST["field_html"])) ? $_POST["field_html"] : NULL;
+    $fiid = (isset($_POST["fiid"])) ? $_POST["fiid"] : NULL;
+    $et = (isset($_POST["et"])) ? $_POST["et"] : NULL;
+    $eid = (isset($_POST["eid"])) ? $_POST["eid"] : NULL;
+    $rtid = (isset($_POST["rtid"])) ? $_POST["rtid"] : NULL;
+    $fname = (isset($_POST["fname"])) ? $_POST["fname"] : NULL;
+
+  if ($text && $selection && $html && $field_html && $fiid && $et && $eid && $rtid) {
+
+    // Get range boundaries
+    $explode = explode(':', $selection);
+    $start = explode(',', $explode[1]);
+    $start = $start[0];
+    $end = $explode[2];
+    
+    $variables = array(
+      'text' => $text,
+      'html' => $html,
+      'field_html' => $field_html,
+      'start' => $start,
+      'end' => $end,
+      'field_instance_id' => $fiid,
+      'entity_type' => $et,
+      'entity_id' => $eid,
+      'rangy_type_id' => $rtid,
+      'field_name' => $fname,
+    );
+    $rangy_type = rangy_get_types($rtid);
+
+    $reactions = module_invoke_all('rangy_reaction_info', $variables);
+
+    foreach ($reactions as $reaction => $keys) {
+      if ($reaction == $rangy_type->settings['reaction']) {
+        // Execute callback
+        if (isset($keys['reaction callback'])) {
+          $args = isset($keys['reaction arguments']) ? $keys['reaction arguments'] : NULL;
+          call_user_func_array($keys['reaction callback'], $args);
+        }
+
+        // Build javascript code
+        $rangy_js = '';
+        foreach ($variables as $key => $value) {
+          $rangy_js .= "var $key='$value';";
+        }
+        if ($keys['first'] && $keys['first'] == 'inline') {
+          $rangy_js .= isset($keys['javascript inline']) ? $keys['javascript inline'] : '';
+          $rangy_js .= isset($keys['javascript file']) ? file_get_contents($keys['javascript file']) : '';
+        } 
+        else {
+          $rangy_js .= isset($keys['javascript file']) ? file_get_contents($keys['javascript file']) : '';
+          $rangy_js .= isset($keys['javascript inline']) ? $keys['javascript inline'] : '';
+        }
+      }
+    }
+
+    $rangy_js = str_replace("\n", " ", $rangy_js);
+
+
+    echo $rangy_js;
+  } 
+  else {
+    echo "FAIL";
+  }
+}

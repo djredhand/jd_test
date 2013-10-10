@@ -1,0 +1,98 @@
+<?php
+
+/**
+ * @file
+ * Sets up the table to store information about the Rangy types.
+ */
+
+
+/**
+ * Implements hook_schema().
+ */
+function rangy_schema() {
+  $schema = array();
+
+  $schema['rangy_type'] = array(
+    'description' => 'Stores information about defined Rangy types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique Rangy type identifier.',
+      ),
+      'type' => array(
+        'description' => 'The machine-readable name of this Rangy type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human-readable name of this Rangy type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'settings' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => TRUE,
+        'description' => 'A serialized array of additional settings related to this Rangy type.',
+      ),
+      'status' => array(
+        'type' => 'int', 
+        'not null' => TRUE,
+        // Set the default to ENTITY_CUSTOM without using the constant as it is
+        // not safe to use it at this point.
+        'default' => 0x01,
+        'size' => 'tiny', 
+        'description' => 'The exportable status of the entity.',
+      ), 
+      'module' => array(
+        'description' => 'The name of the providing module if the entity has been defined in code.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'type' => array('type'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ *Implements hook_schema_alter.
+ */
+function rangy_schema_alter(&$schema) {
+  $schema['field_config_instance']['fields']['rangy_type'] = array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'default' => 0,
+    'description' => 'The ID of the Rangy type enabled for this field instance.',
+  );
+}
+
+/**
+* Implements hook_install().
+*/
+function rangy_install() {
+  $name = array(
+    'type' => 'int',
+    'not null' => TRUE,
+    'default' => 0,
+    'description' => 'The ID of the Rangy type enabled for this field instance.',
+  );
+  db_add_field('field_config_instance', 'rangy_type', $name);
+}
+
+/**
+* Implementation of hook_uninstall().
+*/
+function rangy_uninstall() {
+  db_drop_field('field_config_instance', 'rangy_type');
+}
